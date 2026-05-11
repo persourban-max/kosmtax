@@ -12,23 +12,12 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // Mostrar error si viene en la URL (p.ej. ?error=not_admin)
   useEffect(() => {
     const urlError = searchParams.get("error")
     if (urlError === "not_admin") {
       setError("Tu cuenta no tiene acceso al panel de administración.")
     }
   }, [searchParams])
-
-  // Si ya hay sesión activa de admin, ir al dashboard directamente
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace("/admin/dashboard")
-      }
-    })
-  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
