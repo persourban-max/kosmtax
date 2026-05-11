@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 
 const VOCABULARY_OPTIONS = [
   { label: "Taller / Confección", order: "Orden de producción", orders: "Órdenes de producción", customer: "Cliente", product: "Prenda" },
@@ -25,76 +24,29 @@ export default function OnboardingPage() {
 
   async function handleFinish() {
     setLoading(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      router.push("/app/login")
-      return
-    }
-
     const vocab = VOCABULARY_OPTIONS[form.industry]
-    const slug = form.companyName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-      + "-" + Math.random().toString(36).slice(2, 6)
 
-    // Create tenant
-    const { data: tenant } = await supabase.from("tenants").insert({
-      name: form.companyName || user.user_metadata?.company_name || "Mi Empresa",
-      slug,
-      email: user.email,
-      phone: form.phone || null,
-      city: form.city || null,
-      vocabulary: {
-        order: vocab.order,
-        orders: vocab.orders,
-        customer: vocab.customer,
-        customers: vocab.customer + "s",
-        product: vocab.product,
-        products: vocab.product + "s",
-      },
-    }).select().single()
-
-    if (!tenant) {
-      setLoading(false)
-      return
-    }
-
-    // Add user as owner
-    await supabase.from("tenant_users").insert({
-      tenant_id: tenant.id,
-      user_id: user.id,
-      role: "owner",
-      full_name: user.user_metadata?.full_name || null,
+    const res = await fetch("/api/app/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyName: form.companyName,
+        city: form.city,
+        phone: form.phone,
+        vocabulary: {
+          order: vocab.order,
+          orders: vocab.orders,
+          customer: vocab.customer,
+          customers: vocab.customer + "s",
+          product: vocab.product,
+          products: vocab.product + "s",
+        },
+      }),
     })
 
-    // Create trial subscription
-    const { data: plan } = await supabase.from("plans").select("id").eq("name", "trial").single()
-    if (plan) {
-      const trialStart = new Date()
-      const trialEnd = new Date()
-      trialEnd.setDate(trialEnd.getDate() + 7)
-
-      await supabase.from("subscriptions").insert({
-        tenant_id: tenant.id,
-        plan_id: plan.id,
-        status: "trial",
-        trial_starts_at: trialStart.toISOString(),
-        trial_ends_at: trialEnd.toISOString(),
-      })
-
-      // Enable trial modules
-      const trialModules = ["dashboard", "orders", "inventory", "customers"]
-      await supabase.from("feature_flags").insert(
-        trialModules.map((m) => ({
-          tenant_id: tenant.id,
-          module: m,
-          is_enabled: true,
-          enabled_at: new Date().toISOString(),
-        }))
-      )
+    if (!res.ok) {
+      setLoading(false)
+      return
     }
 
     router.push("/app/dashboard")

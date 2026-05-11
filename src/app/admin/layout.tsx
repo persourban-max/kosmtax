@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import AdminSidebar from "@/components/admin/sidebar"
 
@@ -10,16 +9,12 @@ export default async function AdminLayout({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Solo el dueño puede acceder — validar email de admin
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL
   const isAdmin = user && (!ADMIN_EMAIL || user.email === ADMIN_EMAIL)
 
-  if (!user) {
-    redirect("/admin/login")
-  }
-
+  // Sin sesión admin → renderizar sin shell (ej: página de login)
   if (!isAdmin) {
-    redirect("/admin/login?error=not_admin")
+    return <>{children}</>
   }
 
   return (

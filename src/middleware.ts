@@ -29,7 +29,10 @@ function getSubdomain(request: NextRequest): string {
   }
 
   const parts = hostname.split(".")
-  if (parts.length >= 3) return parts[0]
+  // Solo reconocer subdomains explícitos "app" y "admin"
+  if (parts.length >= 3 && (parts[0] === "app" || parts[0] === "admin")) {
+    return parts[0]
+  }
   return "landing"
 }
 
@@ -105,6 +108,47 @@ export async function middleware(request: NextRequest) {
       }
 
       return rewriteResponse
+    }
+  }
+
+  // ── Path-based routing (dominio único sin subdomains, ej: kosmtax.vercel.app) ──
+  if (pathname.startsWith("/app")) {
+    const isLoginPage = pathname === "/app/login" || pathname === "/app/register"
+    const isProtected = !isLoginPage && APP_PROTECTED_ROUTES.some((r) =>
+      pathname.replace("/app", "").startsWith(r)
+    )
+
+    if (isProtected && !user) {
+      const loginUrl = new URL("/app/login", request.url)
+      loginUrl.searchParams.set("next", pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (isLoginPage && user) {
+      url.pathname = "/app/dashboard"
+      return NextResponse.redirect(url)
+    }
+  }
+
+  if (pathname.startsWith("/admin")) {
+    const isLoginPage = pathname === "/admin/login"
+    const isProtected = ADMIN_PROTECTED_ROUTES.some((r) => pathname.startsWith(r))
+    const isAdmin = user && (!ADMIN_EMAIL || user.email === ADMIN_EMAIL)
+
+    if (isLoginPage && isAdmin) {
+      url.pathname = "/admin/dashboard"
+      url.searchParams.delete("error")
+      return NextResponse.redirect(url)
+    }
+    if (isProtected && !user) {
+      url.pathname = "/admin/login"
+      url.searchParams.delete("error")
+      return NextResponse.redirect(url)
+    }
+    if (isProtected && user && ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
+      url.pathname = "/admin/login"
+      url.searchParams.set("error", "not_admin")
+      return NextResponse.redirect(url)
     }
   }
 
