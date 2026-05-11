@@ -6,11 +6,15 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL
-  const isAdmin = user && (!ADMIN_EMAIL || user.email === ADMIN_EMAIL)
+  let isAdmin = false
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL
+    isAdmin = !!(user && (!ADMIN_EMAIL || user.email === ADMIN_EMAIL))
+  } catch {
+    // Si Supabase falla, renderizar como no-admin (muestra login)
+  }
 
   // Sin sesión admin → renderizar sin shell (ej: página de login)
   if (!isAdmin) {

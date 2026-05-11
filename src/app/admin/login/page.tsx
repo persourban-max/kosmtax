@@ -1,23 +1,25 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
+function ErrorFromUrl({ setError }: { setError: (e: string) => void }) {
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get("error") === "not_admin") {
+      setError("Tu cuenta no tiene acceso al panel de administración.")
+    }
+  }, [searchParams, setError])
+  return null
+}
+
 export default function AdminLoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    const urlError = searchParams.get("error")
-    if (urlError === "not_admin") {
-      setError("Tu cuenta no tiene acceso al panel de administración.")
-    }
-  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,6 +45,10 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-4">
+      <Suspense fallback={null}>
+        <ErrorFromUrl setError={setError} />
+      </Suspense>
+
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-3xl font-bold text-[#2563EB]">KOSMTAX</span>
