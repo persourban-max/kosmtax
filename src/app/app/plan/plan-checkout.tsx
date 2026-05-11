@@ -7,7 +7,7 @@ interface Props {
   price: number; displayName: string; isRecommended?: boolean
 }
 
-export default function PlanCheckout({ planId, tenantId, price, displayName, isRecommended }: Props) {
+export default function PlanCheckout({ planId, tenantId, price, isRecommended }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

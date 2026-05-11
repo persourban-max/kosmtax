@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import PlanCheckout from "./plan-checkout"
 
 type Plan = { id: string; name: string; display_name: string; description: string | null; price_monthly: number; price_yearly: number; modules: string[] }
+type TenantUserRow = { tenant_id: string; tenants: { name: string } | null; subscriptions: { status: string; trial_ends_at: string | null; current_period_end: string | null; plans: { display_name: string } | null }[] }
 
 export default async function PlanPage() {
   const supabase = createClient()
@@ -15,11 +16,12 @@ export default async function PlanPage() {
     .in("name", ["basic", "pro", "full"])
     .order("price_monthly")
 
-  const { data: tenantUser } = await supabase
+  const { data: tenantUserRaw } = await supabase
     .from("tenant_users")
     .select("tenant_id, tenants(name), subscriptions(status, trial_ends_at, current_period_end, plans(display_name))")
     .eq("user_id", user.id)
     .single()
+  const tenantUser = tenantUserRaw as TenantUserRow | null
 
   const plans = (plansRaw ?? []) as Plan[]
   const tenantId = tenantUser?.tenant_id as string | undefined
@@ -65,7 +67,7 @@ export default async function PlanPage() {
 
         {/* Plan cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan, i) => {
+          {plans.map((plan) => {
             const isRecommended = plan.name === "pro"
             const features = planFeatures[plan.name] ?? plan.modules.map((m) => moduleLabels[m] ?? m)
             return (

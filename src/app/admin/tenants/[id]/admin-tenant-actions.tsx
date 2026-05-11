@@ -3,7 +3,7 @@
 import { useState } from "react"
 
 export default function AdminTenantActions({
-  tenantId, currentStatus, isActive
+  tenantId, isActive
 }: { tenantId: string; currentStatus: string; isActive: boolean }) {
   const [plan, setPlan] = useState("basic")
   const [loading, setLoading] = useState(false)

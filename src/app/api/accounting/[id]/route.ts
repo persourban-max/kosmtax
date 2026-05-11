@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("accounting_entries")
@@ -17,7 +17,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   const body = await request.json()
   const { data, error } = await supabase
     .from("accounting_entries")
-    .update(body)
+    .update(body as unknown as never)
     .eq("id", params.id)
     .select()
     .single()
@@ -25,7 +25,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(data)
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { error } = await supabase.from("accounting_entries").delete().eq("id", params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

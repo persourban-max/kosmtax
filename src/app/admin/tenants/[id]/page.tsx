@@ -3,6 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import AdminTenantActions from "./admin-tenant-actions"
 
+type Tenant = { id: string; name: string; slug: string; is_active: boolean; email: string | null; phone: string | null; city: string | null; created_at: string }
 type Payment = { id: string; amount: number; status: string; created_at: string; plans: { display_name: string } | null }
 type TenantUser = { id: string; user_id: string; full_name: string | null; role: string; joined_at: string | null }
 type Feature = { id: string; module: string; is_enabled: boolean }
@@ -10,8 +11,9 @@ type Feature = { id: string; module: string; is_enabled: boolean }
 export default async function AdminTenantDetailPage({ params }: { params: { id: string } }) {
   const supabase = createAdminClient()
 
-  const { data: tenant } = await supabase.from("tenants").select("*").eq("id", params.id).single()
-  if (!tenant) notFound()
+  const { data: tenantRaw } = await supabase.from("tenants").select("*").eq("id", params.id).single()
+  if (!tenantRaw) notFound()
+  const tenant = tenantRaw as Tenant
 
   const { data: subRaw } = await supabase
     .from("subscriptions")
