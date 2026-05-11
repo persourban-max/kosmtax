@@ -1,15 +1,34 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
 export default function AdminLoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  // Mostrar error si viene en la URL (p.ej. ?error=not_admin)
+  useEffect(() => {
+    const urlError = searchParams.get("error")
+    if (urlError === "not_admin") {
+      setError("Tu cuenta no tiene acceso al panel de administración.")
+    }
+  }, [searchParams])
+
+  // Si ya hay sesión activa de admin, ir al dashboard directamente
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace("/admin/dashboard")
+      }
+    })
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,7 +39,11 @@ export default function AdminLoginPage() {
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (authError) {
-      setError(authError.message)
+      setError(
+        authError.message === "Invalid login credentials"
+          ? "Correo o contraseña incorrectos."
+          : authError.message
+      )
       setLoading(false)
       return
     }
@@ -46,6 +69,7 @@ export default function AdminLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
                 placeholder="admin@kosmtax.com"
               />
@@ -57,13 +81,16 @@ export default function AdminLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
+              <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                {error}
+              </p>
             )}
 
             <button

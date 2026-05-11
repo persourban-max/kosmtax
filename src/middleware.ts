@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
 
-// Routes that require auth in the app panel
+// Rutas del panel app que requieren autenticación
 const APP_PROTECTED_ROUTES = [
   "/dashboard",
   "/orders",
@@ -13,7 +13,7 @@ const APP_PROTECTED_ROUTES = [
   "/settings",
 ]
 
-// Routes that require auth in the admin panel
+// Rutas del panel admin que requieren autenticación
 const ADMIN_PROTECTED_ROUTES = [
   "/admin/dashboard",
   "/admin/tenants",
@@ -26,13 +26,13 @@ function getSubdomain(request: NextRequest): string {
   const hostname = request.headers.get("host") || ""
   const url = request.nextUrl.clone()
 
-  // Local development: use searchParam ?subdomain=app|admin
+  // Desarrollo local: usar ?subdomain=app|admin
   if (hostname.includes("localhost") || hostname.includes("127.0.0.1")) {
     return url.searchParams.get("subdomain") || "landing"
   }
 
-  // Production: parse subdomain from hostname
-  // e.g. app.kosmtax.com → "app", admin.kosmtax.com → "admin"
+  // Producción: parsear subdominio desde el hostname
+  // app.kosmtax.com → "app", admin.kosmtax.com → "admin"
   const parts = hostname.split(".")
   if (parts.length >= 3) {
     return parts[0]
@@ -46,28 +46,48 @@ export async function middleware(request: NextRequest) {
   const subdomain = getSubdomain(request)
   const url = request.nextUrl.clone()
   const pathname = url.pathname
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
-  // ── Admin subdomain ──────────────────────────────────────────
+  // ── Panel Admin ───────────────────────────────────────────────
   if (subdomain === "admin") {
-    // Rewrite /anything → /admin/anything
+    const isLoginPage = pathname === "/admin/login" || pathname === "/login"
+
+    // Reescribir rutas sin prefijo /admin → /admin/*
     if (!pathname.startsWith("/admin")) {
       url.pathname = `/admin${pathname === "/" ? "/dashboard" : pathname}`
+    }
+
+    const isProtected = ADMIN_PROTECTED_ROUTES.some((r) => url.pathname.startsWith(r))
+
+    if (!isLoginPage) {
+      // Sin sesión → redirigir al login
+      if (!user && isProtected) {
+        url.pathname = "/admin/login"
+        url.searchParams.delete("error")
+        return NextResponse.redirect(url)
+      }
+
+      // Con sesión pero no es el admin → redirigir con error
+      if (user && ADMIN_EMAIL && user.email !== ADMIN_EMAIL && isProtected) {
+        url.pathname = "/admin/login"
+        url.searchParams.set("error", "not_admin")
+        return NextResponse.redirect(url)
+      }
+    }
+
+    // Si la ruta original no tenía prefijo /admin, hacer rewrite
+    if (!pathname.startsWith("/admin")) {
       const rewriteResponse = NextResponse.rewrite(url)
       supabaseResponse.cookies.getAll().forEach((cookie) => {
         rewriteResponse.cookies.set(cookie.name, cookie.value)
       })
-
-      // Protect admin routes
-      if (!user && ADMIN_PROTECTED_ROUTES.some((r) => url.pathname.startsWith(r))) {
-        url.pathname = "/admin/login"
-        return NextResponse.redirect(url)
-      }
-
       return rewriteResponse
     }
+
+    return supabaseResponse
   }
 
-  // ── App subdomain ─────────────────────────────────────────────
+  // ── Panel App ─────────────────────────────────────────────────
   if (subdomain === "app") {
     if (!pathname.startsWith("/app")) {
       url.pathname = `/app${pathname === "/" ? "/dashboard" : pathname}`
@@ -90,7 +110,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Landing (default) ────────────────────────────────────────
+  // ── Landing (por defecto) ─────────────────────────────────────
   return supabaseResponse
 }
 

@@ -14,8 +14,12 @@ export default async function AdminLayout({
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL
   const isAdmin = user && (!ADMIN_EMAIL || user.email === ADMIN_EMAIL)
 
-  if (!isAdmin) {
+  if (!user) {
     redirect("/admin/login")
+  }
+
+  if (!isAdmin) {
+    redirect("/admin/login?error=not_admin")
   }
 
   return (
