@@ -1,25 +1,51 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import OrderActions from "./order-actions"
+import type { Database } from "@/types/database"
+
+type WorkOrder = Database["public"]["Tables"]["work_orders"]["Row"] & {
+  customers: { full_name: string; email: string | null; phone: string | null; city: string | null } | null
+}
+type WorkOrderItem = Database["public"]["Tables"]["work_order_items"]["Row"] & {
+  inventory_items: { name: string; sku: string | null } | null
+}
 
 export default async function OrderDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
-  const { data: order } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/app/login")
+
+  const admin = createAdminClient()
+  const tenantResult = await admin
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .single()
+  const tenantUser = tenantResult.data as { tenant_id: string } | null
+  if (!tenantUser) redirect("/app/onboarding")
+
+  const tenantId = tenantUser.tenant_id
+
+  const orderResult = await admin
     .from("work_orders")
     .select("*, customers(full_name, email, phone, city)")
     .eq("id", params.id)
+    .eq("tenant_id", tenantId)
     .single()
-
+  const order = orderResult.data as WorkOrder | null
   if (!order) notFound()
 
-  const { data: items } = await supabase
+  const itemsResult = await admin
     .from("work_order_items")
     .select("*, inventory_items(name, sku)")
     .eq("work_order_id", params.id)
+  const items = (itemsResult.data ?? []) as WorkOrderItem[]
 
-  const total = items?.reduce((sum, i) => sum + i.quantity * i.unit_price, 0) ?? 0
-  const customer = order.customers as { full_name: string; email: string | null; phone: string | null; city: string | null } | null
+  const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0)
+  const customer = order.customers
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -44,7 +70,6 @@ export default async function OrderDetailPage({ params }: { params: { id: string
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main info */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-900 mb-4">Detalles</h2>
@@ -104,10 +129,9 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             )}
           </div>
 
-          {/* Items */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-900 mb-4">Items / Materiales</h2>
-            {!items?.length ? (
+            {!items.length ? (
               <p className="text-sm text-gray-400 text-center py-6">Sin items registrados</p>
             ) : (
               <table className="w-full text-sm">
@@ -140,7 +164,6 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           </div>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-4">
           <OrderActions orderId={order.id} currentStatus={order.status} />
 

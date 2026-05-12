@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const supabase = createClient()
-  const { data, error } = await supabase
+  const admin = createAdminClient()
+  const { data, error } = await admin
     .from("customers")
     .select("*")
     .eq("is_active", true)
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const tenantId: string | null = await supabase
+  const admin = createAdminClient()
+  const tenantId: string | null = await admin
     .from("tenant_users")
     .select("tenant_id")
     .eq("user_id", user.id)
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
     tags: [],
     created_by: user.id,
   }
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("customers")
     .insert(insertValues)
     .select()

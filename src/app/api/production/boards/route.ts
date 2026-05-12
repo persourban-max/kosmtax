@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
@@ -8,7 +9,8 @@ export async function POST(request: Request) {
 
   const { name, description } = await request.json()
 
-  const { data: tenantUser } = await supabase
+  const admin = createAdminClient()
+  const { data: tenantUser } = await admin
     .from("tenant_users")
     .select("tenant_id")
     .eq("user_id", user.id)

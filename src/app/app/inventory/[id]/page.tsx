@@ -1,25 +1,50 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import InventoryActions from "./inventory-actions"
+import type { Database } from "@/types/database"
+
+type InventoryItem = Database["public"]["Tables"]["inventory_items"]["Row"] & {
+  inventory_categories: { name: string } | null
+}
+type InventoryMovement = Database["public"]["Tables"]["inventory_movements"]["Row"]
 
 export default async function InventoryItemPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
-  const { data: item } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/app/login")
+
+  const admin = createAdminClient()
+  const tenantResult = await admin
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .single()
+  const tenantUser = tenantResult.data as { tenant_id: string } | null
+  if (!tenantUser) redirect("/app/onboarding")
+
+  const tenantId = tenantUser.tenant_id
+
+  const itemResult = await admin
     .from("inventory_items")
     .select("*, inventory_categories(name)")
     .eq("id", params.id)
+    .eq("tenant_id", tenantId)
     .single()
+  const item = itemResult.data as InventoryItem | null
   if (!item) notFound()
 
-  const { data: movements } = await supabase
+  const movementsResult = await admin
     .from("inventory_movements")
     .select("*")
     .eq("item_id", params.id)
     .order("created_at", { ascending: false })
     .limit(20)
+  const movements = (movementsResult.data ?? []) as InventoryMovement[]
 
-  const category = item.inventory_categories as { name: string } | null
+  const category = item.inventory_categories
   const isLowStock = !item.is_service && item.stock_current <= item.stock_minimum
 
   return (
@@ -68,10 +93,9 @@ export default async function InventoryItemPage({ params }: { params: { id: stri
             )}
           </div>
 
-          {/* Movement history */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-900 mb-4">Historial de movimientos</h2>
-            {!movements?.length ? (
+            {!movements.length ? (
               <p className="text-sm text-gray-400 text-center py-6">Sin movimientos registrados</p>
             ) : (
               <table className="w-full text-sm">
@@ -102,7 +126,6 @@ export default async function InventoryItemPage({ params }: { params: { id: stri
           </div>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-4">
           {!item.is_service && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">

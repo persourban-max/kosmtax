@@ -1,20 +1,40 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import Link from "next/link"
+import { redirect } from "next/navigation"
+import type { Database } from "@/types/database"
+
+type Customer = Database["public"]["Tables"]["customers"]["Row"]
 
 export default async function ClientsPage() {
   const supabase = createClient()
-  const { data: customers } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/app/login")
+
+  const admin = createAdminClient()
+  const tenantResult = await admin
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .single()
+  const tenantUser = tenantResult.data as { tenant_id: string } | null
+  if (!tenantUser) redirect("/app/onboarding")
+
+  const { data: customersRaw } = await admin
     .from("customers")
     .select("*")
+    .eq("tenant_id", tenantUser.tenant_id)
     .eq("is_active", true)
     .order("full_name")
+  const customers = (customersRaw ?? []) as Customer[]
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-          <p className="text-gray-500 text-sm mt-1">{customers?.length ?? 0} clientes</p>
+          <p className="text-gray-500 text-sm mt-1">{customers.length} clientes</p>
         </div>
         <Link
           href="/app/clients/new"
@@ -24,7 +44,7 @@ export default async function ClientsPage() {
         </Link>
       </div>
 
-      {!customers?.length ? (
+      {!customers.length ? (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="text-5xl mb-4">👥</div>
           <h3 className="font-semibold text-gray-900 mb-2">Sin clientes aún</h3>
