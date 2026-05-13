@@ -31,11 +31,45 @@ type Card = {
 
 type Column = { id: string; name: string; color: string; position: number; cards: Card[] }
 
+type FullOrder = {
+  id: string
+  order_number: string
+  title: string
+  description: string | null
+  status: string
+  priority: string
+  price: number | null
+  due_date: string | null
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+  notes: string | null
+  customers: {
+    full_name: string
+    email: string | null
+    phone: string | null
+    city: string | null
+  } | null
+  work_order_items: Array<{
+    id: string
+    description: string
+    quantity: number
+    unit_price: number
+  }>
+}
+
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
   pending: { label: "Pendiente", class: "bg-yellow-100 text-yellow-700" },
   in_progress: { label: "En proceso", class: "bg-blue-100 text-blue-700" },
   completed: { label: "Completado", class: "bg-green-100 text-green-700" },
   cancelled: { label: "Cancelado", class: "bg-red-100 text-red-700" },
+}
+
+const PRIORITY_MAP: Record<string, { label: string; class: string }> = {
+  low: { label: "Baja", class: "bg-gray-100 text-gray-500" },
+  normal: { label: "Normal", class: "bg-gray-100 text-gray-600" },
+  high: { label: "Alta", class: "bg-orange-100 text-orange-600" },
+  urgent: { label: "Urgente", class: "bg-red-100 text-red-600" },
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -56,6 +90,12 @@ export default function KanbanBoardPage() {
   const [newCardTitle, setNewCardTitle] = useState("")
   const dragCardId = useRef<string | null>(null)
   const dragFromColId = useRef<string | null>(null)
+  const wasDragged = useRef(false)
+
+  // Modal state
+  const [modalOrderId, setModalOrderId] = useState<string | null>(null)
+  const [modalOrder, setModalOrder] = useState<FullOrder | null>(null)
+  const [modalLoading, setModalLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -79,7 +119,29 @@ export default function KanbanBoardPage() {
     load()
   }, [id])
 
+  // Close modal on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setModalOrderId(null)
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [])
+
+  async function openOrderModal(orderId: string) {
+    setModalOrderId(orderId)
+    setModalOrder(null)
+    setModalLoading(true)
+    try {
+      const res = await fetch(`/api/orders/${orderId}`)
+      if (res.ok) setModalOrder(await res.json())
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
   function onDragStart(cardId: string, colId: string) {
+    wasDragged.current = true
     dragCardId.current = cardId
     dragFromColId.current = colId
     setDragging(cardId)
@@ -89,6 +151,7 @@ export default function KanbanBoardPage() {
     setDragging(null)
     dragCardId.current = null
     dragFromColId.current = null
+    setTimeout(() => { wasDragged.current = false }, 100)
   }
 
   async function onDrop(targetColId: string) {
@@ -234,7 +297,12 @@ export default function KanbanBoardPage() {
                         <div key={card.id} draggable
                           onDragStart={() => onDragStart(card.id, col.id)}
                           onDragEnd={onDragEnd}
-                          className={`bg-white rounded-xl shadow-sm border transition-all cursor-grab active:cursor-grabbing
+                          onClick={() => {
+                            if (!wasDragged.current && card.work_order_id) {
+                              openOrderModal(card.work_order_id)
+                            }
+                          }}
+                          className={`bg-white rounded-xl shadow-sm border transition-all cursor-pointer
                             ${isUrgent ? "border-red-400 ring-1 ring-red-200" : "border-gray-200 hover:border-blue-200"}
                             ${dragging === card.id ? "opacity-40 scale-95" : "hover:shadow-md"}`}>
 
@@ -398,6 +466,178 @@ export default function KanbanBoardPage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Order detail modal */}
+      {modalOrderId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setModalOrderId(null)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white rounded-2xl w-full max-w-xl max-h-[88vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {modalLoading ? (
+              <div className="p-10 text-center text-gray-400 text-sm">Cargando orden...</div>
+            ) : modalOrder ? (
+              <OrderModal order={modalOrder} onClose={() => setModalOrderId(null)} />
+            ) : (
+              <div className="p-10 text-center text-red-400 text-sm">No se pudo cargar la orden.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OrderModal({ order, onClose }: { order: FullOrder; onClose: () => void }) {
+  const statusInfo = STATUS_MAP[order.status] ?? { label: order.status, class: "bg-gray-100 text-gray-600" }
+  const priorityInfo = PRIORITY_MAP[order.priority] ?? { label: order.priority, class: "bg-gray-100 text-gray-500" }
+  const total = order.work_order_items.reduce((s, i) => s + i.quantity * i.unit_price, 0)
+
+  return (
+    <div className="flex flex-col">
+      {/* Modal header */}
+      <div className="flex items-start justify-between p-5 border-b border-gray-100">
+        <div className="flex-1 min-w-0 pr-3">
+          <p className="text-xs font-mono text-gray-400 mb-1">{order.order_number}</p>
+          <h2 className="text-lg font-bold text-gray-900 leading-snug">{order.title}</h2>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.class}`}>
+              {statusInfo.label}
+            </span>
+            <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityInfo.class}`}>
+              {priorityInfo.label}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="shrink-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg p-1.5 transition-colors text-lg leading-none"
+          aria-label="Cerrar"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Details grid */}
+      <div className="p-5 border-b border-gray-100">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          {order.customers && (
+            <div>
+              <dt className="text-gray-500 text-xs mb-0.5">Cliente</dt>
+              <dd className="font-medium text-gray-900">{order.customers.full_name}</dd>
+              {order.customers.phone && <dd className="text-gray-500 text-xs">{order.customers.phone}</dd>}
+              {order.customers.email && <dd className="text-gray-500 text-xs">{order.customers.email}</dd>}
+            </div>
+          )}
+          {order.price != null && (
+            <div>
+              <dt className="text-gray-500 text-xs mb-0.5">Precio</dt>
+              <dd className="font-bold text-gray-900 text-base">${Number(order.price).toLocaleString("es-CO")}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-gray-500 text-xs mb-0.5">Creado</dt>
+            <dd className="font-medium text-gray-900">{new Date(order.created_at).toLocaleDateString("es-CO")}</dd>
+          </div>
+          {order.due_date && (
+            <div>
+              <dt className="text-gray-500 text-xs mb-0.5">Fecha límite</dt>
+              <dd className="font-medium text-orange-600">{new Date(order.due_date + "T00:00:00").toLocaleDateString("es-CO")}</dd>
+            </div>
+          )}
+          {order.started_at && (
+            <div>
+              <dt className="text-gray-500 text-xs mb-0.5">Iniciado</dt>
+              <dd className="font-medium text-gray-900">{new Date(order.started_at).toLocaleDateString("es-CO")}</dd>
+            </div>
+          )}
+          {order.completed_at && (
+            <div>
+              <dt className="text-gray-500 text-xs mb-0.5">Completado</dt>
+              <dd className="font-medium text-green-700">{new Date(order.completed_at).toLocaleDateString("es-CO")}</dd>
+            </div>
+          )}
+        </dl>
+      </div>
+
+      {/* Description & notes */}
+      {(order.description || order.notes) && (
+        <div className="p-5 border-b border-gray-100 space-y-3">
+          {order.description && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Descripción</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.description}</p>
+            </div>
+          )}
+          {order.notes && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Notas internas</p>
+              <p className="text-sm text-gray-600 bg-yellow-50 rounded-lg p-3 whitespace-pre-wrap">{order.notes}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Items */}
+      {order.work_order_items.length > 0 && (
+        <div className="p-5 border-b border-gray-100">
+          <p className="text-xs text-gray-500 mb-3">Items / Materiales</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 text-left">
+                <th className="pb-2 font-medium text-gray-600">Descripción</th>
+                <th className="pb-2 font-medium text-gray-600 text-right">Cant.</th>
+                <th className="pb-2 font-medium text-gray-600 text-right">Precio</th>
+                <th className="pb-2 font-medium text-gray-600 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.work_order_items.map((item) => (
+                <tr key={item.id} className="border-b border-gray-50">
+                  <td className="py-1.5 text-gray-900">{item.description}</td>
+                  <td className="py-1.5 text-gray-600 text-right">{item.quantity}</td>
+                  <td className="py-1.5 text-gray-600 text-right">${Number(item.unit_price).toLocaleString("es-CO")}</td>
+                  <td className="py-1.5 font-medium text-gray-900 text-right">${(item.quantity * item.unit_price).toLocaleString("es-CO")}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3} className="pt-2 font-semibold text-gray-900 text-right text-sm">Total:</td>
+                <td className="pt-2 font-bold text-gray-900 text-right text-sm">${total.toLocaleString("es-CO")}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* Footer actions */}
+      <div className="p-4 flex items-center justify-between gap-3">
+        <button
+          onClick={onClose}
+          className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          Cerrar
+        </button>
+        <div className="flex gap-2">
+          <Link
+            href={`/app/orders/${order.id}/edit`}
+            className="text-sm border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Editar
+          </Link>
+          <Link
+            href={`/app/orders/${order.id}`}
+            className="text-sm bg-[#2563EB] hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+          >
+            Ver completo →
+          </Link>
+        </div>
       </div>
     </div>
   )
