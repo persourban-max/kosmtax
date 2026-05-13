@@ -45,14 +45,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   const body = await request.json()
 
-  // Obtener precio actual para detectar cambios
+  // Obtener precio y estado actual para detectar cambios
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: currentOrder } = await (admin as any)
     .from("work_orders")
-    .select("price, order_number, title, customer_id")
+    .select("price, order_number, title, customer_id, status")
     .eq("id", params.id)
     .eq("tenant_id", tenantId)
-    .single() as { data: { price: number | null; order_number: string; title: string; customer_id: string | null } | null }
+    .single() as { data: { price: number | null; order_number: string; title: string; customer_id: string | null; status: string } | null }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (admin as any)
@@ -109,6 +109,49 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       } catch {
         // No fallar la orden si falla la contabilidad
       }
+    }
+  }
+
+  // Sincronizar tarjeta de producción si cambió el estado
+  if ("status" in body && currentOrder && body.status !== currentOrder.status) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: card } = await (admin as any)
+        .from("production_cards")
+        .select("id, board_id")
+        .eq("work_order_id", params.id)
+        .maybeSingle()
+
+      if (card) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: cols } = await (admin as any)
+          .from("production_columns")
+          .select("id, position")
+          .eq("board_id", card.board_id)
+          .order("position")
+
+        if (cols && cols.length > 0) {
+          let targetColId: string | null = null
+          if (body.status === "pending") {
+            targetColId = cols[0].id
+          } else if (body.status === "in_progress") {
+            targetColId = cols.length > 1 ? cols[1].id : cols[0].id
+          } else if (body.status === "completed") {
+            targetColId = cols[cols.length - 1].id
+          }
+          // cancelled: no mover la tarjeta de producción
+
+          if (targetColId) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (admin as any)
+              .from("production_cards")
+              .update({ column_id: targetColId })
+              .eq("id", card.id)
+          }
+        }
+      }
+    } catch {
+      // No fallar la orden si falla la sincronización con producción
     }
   }
 

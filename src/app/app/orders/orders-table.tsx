@@ -12,9 +12,9 @@ type Order = {
 }
 
 const STATUS_MAP: Record<string, { label: string; class: string }> = {
-  pending: { label: "Pendiente", class: "bg-yellow-100 text-yellow-700" },
+  pending: { label: "Recibido", class: "bg-yellow-100 text-yellow-700" },
   in_progress: { label: "En proceso", class: "bg-blue-100 text-blue-700" },
-  completed: { label: "Completado", class: "bg-green-100 text-green-700" },
+  completed: { label: "Terminado", class: "bg-green-100 text-green-700" },
   cancelled: { label: "Cancelado", class: "bg-red-100 text-red-700" },
 }
 
