@@ -55,6 +55,25 @@ export async function POST(request: Request) {
     // No fallar la orden si falla la tarjeta
   }
 
+  // Auto-registrar en contabilidad si tiene precio
+  if (data.price && Number(data.price) > 0) {
+    try {
+      const today = new Date().toISOString().split("T")[0]
+      await admin.from("accounting_entries").insert({
+        tenant_id: tenantId,
+        type: "income",
+        amount: Number(data.price),
+        description: `Ingreso orden ${data.order_number} — ${data.title}`,
+        date: today,
+        work_order_id: data.id,
+        customer_id: data.customer_id || null,
+        created_by: user.id,
+      })
+    } catch {
+      // No fallar la orden si falla la contabilidad
+    }
+  }
+
   return NextResponse.json(data, { status: 201 })
 }
 

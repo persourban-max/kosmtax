@@ -30,14 +30,88 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+
+  const admin = createAdminClient()
+  const tenantId: string | null = await admin
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .single()
+    .then(({ data }) => (data as { tenant_id: string } | null)?.tenant_id ?? null)
+  if (!tenantId) return NextResponse.json({ error: "Sin tenant" }, { status: 403 })
+
   const body = await request.json()
-  const { data, error } = await supabase
+
+  // Obtener precio actual para detectar cambios
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: currentOrder } = await (admin as any)
+    .from("work_orders")
+    .select("price, order_number, title, customer_id")
+    .eq("id", params.id)
+    .eq("tenant_id", tenantId)
+    .single() as { data: { price: number | null; order_number: string; title: string; customer_id: string | null } | null }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (admin as any)
     .from("work_orders")
     .update(body)
     .eq("id", params.id)
+    .eq("tenant_id", tenantId)
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  // Sincronizar contabilidad si el precio cambió
+  if ("price" in body && currentOrder) {
+    const oldPrice = currentOrder.price ? Number(currentOrder.price) : null
+    const newPrice = body.price ? Number(body.price) : null
+
+    if (oldPrice !== newPrice) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: existingEntry } = await (admin as any)
+          .from("accounting_entries")
+          .select("id")
+          .eq("work_order_id", params.id)
+          .eq("type", "income")
+          .maybeSingle()
+
+        if (newPrice && newPrice > 0) {
+          const orderNum = currentOrder.order_number ?? data.order_number
+          const orderTitle = currentOrder.title ?? data.title
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const acct = admin as any
+          if (existingEntry) {
+            await acct.from("accounting_entries").update({
+              amount: newPrice,
+              description: `Ingreso orden ${orderNum} — ${orderTitle}`,
+            }).eq("id", existingEntry.id)
+          } else {
+            const today = new Date().toISOString().split("T")[0]
+            await acct.from("accounting_entries").insert({
+              tenant_id: tenantId,
+              type: "income",
+              amount: newPrice,
+              description: `Ingreso orden ${orderNum} — ${orderTitle}`,
+              date: today,
+              work_order_id: params.id,
+              customer_id: body.customer_id || currentOrder.customer_id || null,
+              created_by: user.id,
+            })
+          }
+        } else if (existingEntry) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (admin as any).from("accounting_entries").delete().eq("id", existingEntry.id)
+        }
+      } catch {
+        // No fallar la orden si falla la contabilidad
+      }
+    }
+  }
+
   return NextResponse.json(data)
 }
 

@@ -63,10 +63,20 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             <PriorityBadge priority={order.priority} />
           </div>
         </div>
-        <Link href={`/app/orders/${order.id}/edit`}
-          className="shrink-0 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-          Editar
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href={`/app/orders/${order.id}/print`}
+            className="border border-gray-300 text-gray-700 text-sm font-medium px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Imprimir
+          </Link>
+          <Link href={`/app/orders/${order.id}/edit`}
+            className="border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+            Editar
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -165,7 +175,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
         </div>
 
         <div className="space-y-4">
-          <OrderActions orderId={order.id} currentStatus={order.status} />
+          <OrderActions orderId={order.id} currentStatus={order.status} currentPrice={order.price ? Number(order.price) : null} />
 
           {customer && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
