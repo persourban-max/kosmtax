@@ -1,16 +1,28 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
+import SyncOrdersButton from "./sync-button"
+
+type Entry = {
+  id: string
+  date: string
+  description: string
+  type: "income" | "expense"
+  amount: number
+  accounting_categories: { name: string } | null
+}
 
 export default async function AccountingPage() {
   const supabase = createClient()
-  const { data: entries } = await supabase
+  const { data: rawEntries } = await supabase
     .from("accounting_entries")
-    .select("*, accounting_categories(name)")
+    .select("id, date, description, type, amount, accounting_categories(name)")
     .order("date", { ascending: false })
     .limit(50)
 
-  const income = entries?.filter((e) => e.type === "income").reduce((acc, e) => acc + Number(e.amount), 0) ?? 0
-  const expense = entries?.filter((e) => e.type === "expense").reduce((acc, e) => acc + Number(e.amount), 0) ?? 0
+  const entries = (rawEntries ?? []) as unknown as Entry[]
+
+  const income = entries.filter((e) => e.type === "income").reduce((acc, e) => acc + Number(e.amount), 0)
+  const expense = entries.filter((e) => e.type === "expense").reduce((acc, e) => acc + Number(e.amount), 0)
   const balance = income - expense
 
   return (
@@ -20,7 +32,8 @@ export default async function AccountingPage() {
           <h1 className="text-2xl font-bold text-gray-900">Contabilidad</h1>
           <p className="text-gray-500 text-sm mt-1">Ingresos, egresos y balance</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <SyncOrdersButton />
           <Link
             href="/app/accounting/new?type=income"
             className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -54,7 +67,7 @@ export default async function AccountingPage() {
         </div>
       </div>
 
-      {!entries?.length ? (
+      {!entries.length ? (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="text-5xl mb-4">💰</div>
           <h3 className="font-semibold text-gray-900 mb-2">Sin movimientos</h3>
@@ -78,7 +91,7 @@ export default async function AccountingPage() {
                   <td className="px-4 py-3 text-gray-500">{new Date(entry.date).toLocaleDateString("es-CO")}</td>
                   <td className="px-4 py-3 text-gray-900">{entry.description}</td>
                   <td className="px-4 py-3 text-gray-500">
-                    {(entry.accounting_categories as { name: string } | null)?.name ?? "—"}
+                    {entry.accounting_categories?.name ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
