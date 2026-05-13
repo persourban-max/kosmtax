@@ -7,12 +7,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
 
-  const { column_id, position } = await request.json()
+  const { labels } = await request.json()
   const admin = createAdminClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (admin as any)
     .from("production_cards")
-    .update({ column_id, position: position ?? 0 })
+    .update({ labels })
     .eq("id", params.id)
     .select()
     .single()
