@@ -1,13 +1,17 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
+import SyncOrdersButton from "./sync-button"
+
+type Board = { id: string; name: string; description: string | null }
 
 export default async function ProductionPage() {
   const supabase = createClient()
-  const { data: boards } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: boards } = await (supabase as any)
     .from("production_boards")
     .select("*")
     .eq("is_active", true)
-    .order("created_at")
+    .order("created_at") as { data: Board[] | null }
 
   return (
     <div className="p-6">
@@ -16,12 +20,15 @@ export default async function ProductionPage() {
           <h1 className="text-2xl font-bold text-gray-900">Producción</h1>
           <p className="text-gray-500 text-sm mt-1">Vista Kanban de tu flujo de trabajo</p>
         </div>
-        <Link
-          href="/app/production/new"
-          className="bg-[#2563EB] hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          + Nuevo tablero
-        </Link>
+        <div className="flex items-center gap-3">
+          <SyncOrdersButton />
+          <Link
+            href="/app/production/new"
+            className="bg-[#2563EB] hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            + Nuevo tablero
+          </Link>
+        </div>
       </div>
 
       {!boards?.length ? (
