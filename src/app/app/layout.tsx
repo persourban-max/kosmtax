@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import AppSidebar from "@/components/app/sidebar"
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/app/login")
+    return <>{children}</>
   }
 
   const admin = createAdminClient()
@@ -19,8 +19,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .single()
 
   if (!tenantUser) {
-    redirect("/app/onboarding")
+    return <>{children}</>
   }
 
-  return <>{children}</>
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <AppSidebar />
+      <main className="flex-1 overflow-auto pb-16 md:pb-0">
+        {children}
+      </main>
+    </div>
+  )
 }
