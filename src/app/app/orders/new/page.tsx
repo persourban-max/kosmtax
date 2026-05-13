@@ -12,6 +12,9 @@ export default function NewOrderPage() {
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showNewCustomer, setShowNewCustomer] = useState(false)
+  const [newCustomer, setNewCustomer] = useState({ full_name: "", phone: "", email: "" })
+  const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [form, setForm] = useState({
     title: "",
     customer_id: "",
@@ -31,6 +34,26 @@ export default function NewOrderPage() {
 
   function set(field: string, value: string) {
     setForm((p) => ({ ...p, [field]: value }))
+  }
+
+  async function handleCreateCustomer() {
+    if (!newCustomer.full_name.trim()) return
+    setCreatingCustomer(true)
+    const res = await fetch("/api/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newCustomer),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      const updated = [...customers, { id: data.id, full_name: data.full_name }]
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+      setCustomers(updated)
+      set("customer_id", data.id)
+      setShowNewCustomer(false)
+      setNewCustomer({ full_name: "", phone: "", email: "" })
+    }
+    setCreatingCustomer(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,15 +93,67 @@ export default function NewOrderPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-            <select value={form.customer_id} onChange={(e) => set("customer_id", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        {/* Cliente con opción de crear nuevo */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-gray-700">Cliente</label>
+            <button
+              type="button"
+              onClick={() => { setShowNewCustomer(!showNewCustomer); setNewCustomer({ full_name: "", phone: "", email: "" }) }}
+              className="text-xs text-[#2563EB] hover:underline font-medium"
+            >
+              {showNewCustomer ? "← Seleccionar existente" : "+ Nuevo cliente"}
+            </button>
+          </div>
+
+          {showNewCustomer ? (
+            <div className="border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
+              <p className="text-xs font-semibold text-blue-700">Crear nuevo cliente</p>
+              <input
+                type="text"
+                value={newCustomer.full_name}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, full_name: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Nombre completo *"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="tel"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Teléfono"
+                />
+                <input
+                  type="email"
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Email"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateCustomer}
+                disabled={creatingCustomer || !newCustomer.full_name.trim()}
+                className="w-full bg-[#2563EB] hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              >
+                {creatingCustomer ? "Creando..." : "Crear y seleccionar cliente"}
+              </button>
+            </div>
+          ) : (
+            <select
+              value={form.customer_id}
+              onChange={(e) => set("customer_id", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
               <option value="">Sin cliente asignado</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
             </select>
-          </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
             <select value={form.priority} onChange={(e) => set("priority", e.target.value)}
@@ -88,9 +163,6 @@ export default function NewOrderPage() {
               <option value="urgent">Urgente</option>
             </select>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Estado inicial</label>
             <select value={form.status} onChange={(e) => set("status", e.target.value)}
@@ -99,11 +171,12 @@ export default function NewOrderPage() {
               <option value="in_progress">En proceso</option>
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha límite</label>
-            <input type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha límite</label>
+          <input type="date" value={form.due_date} onChange={(e) => set("due_date", e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
 
         <div>
@@ -128,6 +201,11 @@ export default function NewOrderPage() {
           <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2}
             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             placeholder="Notas solo visibles para el equipo..." />
+        </div>
+
+        <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700 flex items-center gap-2">
+          <span>🏭</span>
+          <span>Al crear la orden aparecerá automáticamente en el tablero de Producción.</span>
         </div>
 
         <div className="flex gap-3 pt-2">

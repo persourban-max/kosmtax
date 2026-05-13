@@ -47,5 +47,80 @@ export async function POST(request: Request) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  // Auto-crear tarjeta en tablero de producción
+  try {
+    await autoCreateProductionCard(admin, tenantId, user.id, data, body)
+  } catch {
+    // No fallar la orden si falla la tarjeta
+  }
+
   return NextResponse.json(data, { status: 201 })
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function autoCreateProductionCard(admin: any, tenantId: string, userId: string, order: any, body: any) {
+  // Buscar tablero activo del tenant
+  const { data: board } = await admin
+    .from("production_boards")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .order("created_at")
+    .limit(1)
+    .single()
+
+  let boardId: string | null = board?.id ?? null
+
+  // Si no hay tablero, crear uno por defecto
+  if (!boardId) {
+    const { data: newBoard } = await admin
+      .from("production_boards")
+      .insert({
+        tenant_id: tenantId,
+        name: "Producción",
+        is_default: true,
+        is_active: true,
+        created_by: userId,
+      })
+      .select()
+      .single()
+    boardId = newBoard?.id ?? null
+
+    if (boardId) {
+      await admin.from("production_columns").insert([
+        { tenant_id: tenantId, board_id: boardId, name: "Por hacer", color: "#94A3B8", position: 0 },
+        { tenant_id: tenantId, board_id: boardId, name: "En proceso", color: "#2563EB", position: 1 },
+        { tenant_id: tenantId, board_id: boardId, name: "En revisión", color: "#F59E0B", position: 2 },
+        { tenant_id: tenantId, board_id: boardId, name: "Listo", color: "#10B981", position: 3 },
+      ])
+    }
+  }
+
+  if (!boardId) return
+
+  // Buscar primera columna del tablero
+  const { data: firstCol } = await admin
+    .from("production_columns")
+    .select("id")
+    .eq("board_id", boardId)
+    .order("position")
+    .limit(1)
+    .single()
+
+  if (!firstCol) return
+
+  const labels: string[] = []
+  if (body.priority === "urgent") labels.push("urgente")
+
+  await admin.from("production_cards").insert({
+    tenant_id: tenantId,
+    board_id: boardId,
+    column_id: firstCol.id,
+    work_order_id: order.id,
+    title: `${order.order_number} — ${order.title}`,
+    description: body.description || null,
+    position: 0,
+    labels,
+  })
 }

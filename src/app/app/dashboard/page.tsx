@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
+import QuickOrderForm from "./quick-order-form"
 
 export default async function DashboardPage() {
   const supabase = createClient()
@@ -11,64 +12,61 @@ export default async function DashboardPage() {
 
   const { count: activeOrders } = await supabase
     .from("work_orders").select("*", { count: "exact", head: true }).in("status", ["pending", "in_progress"])
+
   const { count: totalCustomers } = await supabase
     .from("customers").select("*", { count: "exact", head: true }).eq("is_active", true)
+
   const { data: monthIncomeData } = await supabase
     .from("accounting_entries").select("amount").eq("type", "income").gte("date", monthStartStr)
+
   const { data: allInventory } = await supabase
     .from("inventory_items").select("id, name, stock_current, stock_minimum, unit").eq("is_active", true).eq("is_service", false)
+
   const { data: recentOrders } = await supabase
     .from("work_orders")
-    .select("id, order_number, title, status, price, created_at, customers(full_name)")
+    .select("id, order_number, title, status, priority, price, created_at, customers(full_name)")
     .order("created_at", { ascending: false })
-    .limit(5)
+    .limit(8)
+
+  const { data: customers } = await supabase
+    .from("customers").select("id, full_name").eq("is_active", true).order("full_name")
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: productionBoardsRaw } = await (supabase as any)
+    .from("production_boards")
+    .select("id, name, production_columns(id, name, color, position)")
+    .eq("is_active", true)
+    .order("created_at")
+    .limit(3)
+
+  type ProdBoard = { id: string; name: string; production_columns: { id: string; name: string; color: string; position: number }[] | null }
+  const productionBoards = (productionBoardsRaw ?? []) as ProdBoard[]
 
   const totalMonthIncome = monthIncomeData?.reduce((s, e) => s + (e.amount ?? 0), 0) ?? 0
   const lowStock = allInventory?.filter((i) => i.stock_current <= i.stock_minimum) ?? []
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-gray-900">Panel de Control</h1>
+        <p className="text-gray-500 text-sm mt-0.5">
           Bienvenido, {user?.user_metadata?.full_name || user?.email?.split("@")[0]}
         </p>
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <MetricCard
-          label="Órdenes activas"
-          value={String(activeOrders ?? 0)}
-          icon="📋"
-          color="blue"
-          href="/app/orders"
-        />
-        <MetricCard
-          label="Clientes"
-          value={String(totalCustomers ?? 0)}
-          icon="👥"
-          color="purple"
-          href="/app/clients"
-        />
-        <MetricCard
-          label="Ingresos del mes"
-          value={`$${totalMonthIncome.toLocaleString("es-CO")}`}
-          icon="💰"
-          color="green"
-          href="/app/accounting"
-        />
-        <MetricCard
-          label="Alertas de stock"
-          value={String(lowStock.length)}
-          icon={lowStock.length > 0 ? "⚠️" : "✅"}
-          color={lowStock.length > 0 ? "amber" : "green"}
-          href="/app/inventory"
-        />
+      {/* Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <MetricCard label="Órdenes activas" value={String(activeOrders ?? 0)} icon="📋" color="blue" href="/app/orders" />
+        <MetricCard label="Clientes" value={String(totalCustomers ?? 0)} icon="👥" color="purple" href="/app/clients" />
+        <MetricCard label="Ingresos del mes" value={`$${totalMonthIncome.toLocaleString("es-CO")}`} icon="💰" color="green" href="/app/accounting" />
+        <MetricCard label="Alertas stock" value={String(lowStock.length)} icon={lowStock.length > 0 ? "⚠️" : "✅"} color={lowStock.length > 0 ? "amber" : "green"} href="/app/inventory" />
       </div>
 
+      {/* Quick order form — Panel de Control */}
+      <QuickOrderForm customers={customers ?? []} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent orders */}
+        {/* Recent orders table */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">Órdenes recientes</h2>
@@ -77,10 +75,7 @@ export default async function DashboardPage() {
           {!recentOrders?.length ? (
             <div className="text-center py-10 text-gray-400">
               <div className="text-4xl mb-3">📋</div>
-              <p className="text-sm">No hay órdenes aún</p>
-              <Link href="/app/orders/new" className="text-[#2563EB] text-sm hover:underline mt-2 inline-block">
-                Crear primera orden →
-              </Link>
+              <p className="text-sm">Crea tu primera orden arriba</p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -118,6 +113,42 @@ export default async function DashboardPage() {
 
         {/* Right column */}
         <div className="space-y-4">
+          {/* Production boards summary */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-900">Producción</h2>
+              <Link href="/app/production" className="text-[#2563EB] text-xs hover:underline">Ver tableros →</Link>
+            </div>
+            {!productionBoards.length ? (
+              <div className="text-center py-6 text-gray-400">
+                <div className="text-2xl mb-1">🏭</div>
+                <p className="text-xs">Las órdenes creadas aparecerán aquí automáticamente</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {productionBoards.map((board) => {
+                  const cols = board.production_columns ?? []
+                  const sortedCols = [...cols].sort((a, b) => a.position - b.position)
+                  return (
+                    <div key={board.id}>
+                      <Link href={`/app/production/${board.id}`} className="text-sm font-medium text-gray-800 hover:text-[#2563EB]">
+                        {board.name}
+                      </Link>
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        {sortedCols.map((col) => (
+                          <span key={col.id} className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 rounded px-2 py-0.5 border border-gray-100">
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: col.color }} />
+                            {col.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Stock alerts */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-3">
@@ -125,7 +156,7 @@ export default async function DashboardPage() {
               <Link href="/app/inventory" className="text-[#2563EB] text-xs hover:underline">Ver →</Link>
             </div>
             {lowStock.length === 0 ? (
-              <div className="text-center py-6 text-gray-400">
+              <div className="text-center py-4 text-gray-400">
                 <div className="text-2xl mb-1">✅</div>
                 <p className="text-xs">Todo el stock OK</p>
               </div>
@@ -147,24 +178,6 @@ export default async function DashboardPage() {
               </div>
             )}
           </div>
-
-          {/* Quick access */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Accesos rápidos</h2>
-            <div className="space-y-1.5">
-              {[
-                { href: "/app/orders/new", label: "+ Nueva orden", color: "text-[#2563EB]" },
-                { href: "/app/clients/new", label: "+ Nuevo cliente", color: "text-purple-600" },
-                { href: "/app/accounting/new", label: "+ Registrar ingreso/egreso", color: "text-green-600" },
-                { href: "/app/production/new", label: "+ Nuevo tablero Kanban", color: "text-orange-600" },
-              ].map((link) => (
-                <Link key={link.href} href={link.href}
-                  className={`block text-sm font-medium ${link.color} hover:underline py-0.5`}>
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -181,10 +194,10 @@ function MetricCard({ label, value, icon, color, href }: {
     amber: "bg-amber-50 text-amber-600",
   }
   return (
-    <Link href={href} className="bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-200 hover:shadow-sm transition-all block">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-gray-500">{label}</span>
-        <span className={`text-lg w-9 h-9 rounded-lg flex items-center justify-center ${colorMap[color] ?? "bg-gray-50"}`}>{icon}</span>
+    <Link href={href} className="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-200 hover:shadow-sm transition-all block">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-gray-500">{label}</span>
+        <span className={`text-base w-8 h-8 rounded-lg flex items-center justify-center ${colorMap[color] ?? "bg-gray-50"}`}>{icon}</span>
       </div>
       <div className="text-2xl font-bold text-gray-900">{value}</div>
     </Link>
