@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
+import ClientCombobox from "@/components/app/ClientCombobox"
 
 type Customer = { id: string; full_name: string }
 
@@ -142,14 +143,12 @@ export default function NewOrderPage() {
               </button>
             </div>
           ) : (
-            <select
+            <ClientCombobox
+              customers={customers}
               value={form.customer_id}
-              onChange={(e) => set("customer_id", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="">Sin cliente asignado</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-            </select>
+              onChange={(id) => set("customer_id", id)}
+              placeholder="Buscar cliente existente..."
+            />
           )}
         </div>
 

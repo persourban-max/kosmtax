@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import ClientCombobox from "@/components/app/ClientCombobox"
 
 type Customer = { id: string; full_name: string }
 
@@ -151,14 +152,11 @@ export default function QuickOrderForm({ customers: initialCustomers }: { custom
                 </button>
               </div>
             ) : (
-              <select
+              <ClientCombobox
+                customers={customers}
                 value={form.customer_id}
-                onChange={(e) => setF("customer_id", e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              >
-                <option value="">Sin cliente</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-              </select>
+                onChange={(id) => setF("customer_id", id)}
+              />
             )}
           </div>
 
