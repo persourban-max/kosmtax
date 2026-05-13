@@ -89,10 +89,9 @@ async function autoCreateProductionCard(admin: any, tenantId: string, userId: st
 
     if (boardId) {
       await admin.from("production_columns").insert([
-        { tenant_id: tenantId, board_id: boardId, name: "Por hacer", color: "#94A3B8", position: 0 },
-        { tenant_id: tenantId, board_id: boardId, name: "En proceso", color: "#2563EB", position: 1 },
-        { tenant_id: tenantId, board_id: boardId, name: "En revisión", color: "#F59E0B", position: 2 },
-        { tenant_id: tenantId, board_id: boardId, name: "Listo", color: "#10B981", position: 3 },
+        { tenant_id: tenantId, board_id: boardId, name: "Recibido", color: "#94A3B8", position: 0 },
+        { tenant_id: tenantId, board_id: boardId, name: "En Proceso", color: "#2563EB", position: 1 },
+        { tenant_id: tenantId, board_id: boardId, name: "Terminado", color: "#10B981", position: 2 },
       ])
     }
   }

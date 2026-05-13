@@ -17,7 +17,9 @@ export async function POST(request: Request) {
     .single()
   if (!tenantUser) return NextResponse.json({ error: "No tenant" }, { status: 400 })
 
-  const { data: board, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  const { data: board, error } = await sb
     .from("production_boards")
     .insert({
       name,
@@ -32,16 +34,15 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
   const defaultColumns = [
-    { name: "Por hacer", color: "#94A3B8", position: 0 },
-    { name: "En proceso", color: "#2563EB", position: 1 },
-    { name: "En revisión", color: "#F59E0B", position: 2 },
-    { name: "Listo", color: "#10B981", position: 3 },
+    { name: "Recibido", color: "#94A3B8", position: 0 },
+    { name: "En Proceso", color: "#2563EB", position: 1 },
+    { name: "Terminado", color: "#10B981", position: 2 },
   ]
-  await supabase.from("production_columns").insert(
+  await sb.from("production_columns").insert(
     defaultColumns.map((c) => ({
       ...c,
       board_id: board.id,
-      tenant_id: tenantUser.tenant_id,
+      tenant_id: (tenantUser as { tenant_id: string }).tenant_id,
     }))
   )
 
