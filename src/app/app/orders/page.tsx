@@ -1,13 +1,36 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 
 export default async function OrdersPage() {
   const supabase = createClient()
-  const { data: orders } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/app/login")
+
+  const admin = createAdminClient()
+  const tenantResult = await admin
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .single()
+  const tenantRow = tenantResult.data as { tenant_id: string } | null
+  if (!tenantRow) redirect("/app/onboarding")
+
+  const tenantId = tenantRow.tenant_id
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: ordersRaw } = await (admin as any)
     .from("work_orders")
     .select("*, customers(full_name)")
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(50)
+  const orders = (ordersRaw ?? []) as Array<{
+    id: string; order_number: string; title: string; status: string;
+    created_at: string; customers: { full_name: string } | null
+  }>
 
   return (
     <div className="p-6">
