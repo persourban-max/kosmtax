@@ -43,15 +43,18 @@ export default function NewDocumentPage() {
       quantity: form.quantity, specifications: form.specifications, delivery_date: form.delivery_date,
     }
 
-    const supabase = createClient()
-    const { data: authUser } = await supabase.auth.getUser()
-    const { data, error: err } = await supabase.from("documents").insert({
-      title: form.title, type: form.type,
-      customer_id: form.customer_id || null, work_order_id: form.work_order_id || null,
-      content, is_printed: false, created_by: authUser.user?.id,
-    }).select().single()
+    const res = await fetch("/api/documents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: form.title, type: form.type,
+        customer_id: form.customer_id || null, work_order_id: form.work_order_id || null,
+        content,
+      }),
+    })
+    const data = await res.json()
 
-    if (err) { setError(err.message); setLoading(false); return }
+    if (!res.ok) { setError(data.error || "Error al crear el documento"); setLoading(false); return }
     router.push(`/app/documents/${data.id}`)
   }
 

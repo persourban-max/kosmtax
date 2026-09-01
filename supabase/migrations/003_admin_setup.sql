@@ -64,11 +64,9 @@ create policy "system_config: sin acceso a usuarios regulares"
   using (false);
 
 -- ── Registrar el admin principal ─────────────────────────────
--- IMPORTANTE: Reemplaza el email de abajo con tu ADMIN_EMAIL real
--- y ejecuta este INSERT después de crear tu cuenta en Supabase Auth.
---
--- INSERT INTO system_admins (email, notes)
--- VALUES ('tu@email.com', 'Administrador principal KOSMTAX');
---
+INSERT INTO system_admins (email, notes)
+VALUES ('jeanmb1020@hotmail.com', 'Administrador principal KOSMTAX')
+ON CONFLICT (email) DO NOTHING;
+
 -- ── Verificar que quedó bien ──────────────────────────────────
 -- SELECT * FROM system_admins;

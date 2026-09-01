@@ -33,10 +33,14 @@ export default function NewInventoryItemPage() {
     if (!newCatName.trim()) return
     setAddingCat(true)
     const supabase = createClient()
-    const { data: tenantUser } = await supabase.from("tenant_users").select("tenant_id").single()
+    const { data: tenantUser } = await supabase.from("tenant_users").select("tenant_id").eq("is_active", true).single()
+    if (!tenantUser) {
+      setAddingCat(false)
+      return
+    }
     const { data } = await supabase.from("inventory_categories").insert({
       name: newCatName.trim(),
-      tenant_id: tenantUser?.tenant_id,
+      tenant_id: tenantUser.tenant_id,
     }).select().single()
     if (data) {
       setCategories((p) => [...p, data].sort((a, b) => a.name.localeCompare(b.name)))

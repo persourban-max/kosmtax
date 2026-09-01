@@ -1,4 +1,4 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type PlanType = 'trial' | 'basic' | 'pro' | 'full'
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'suspended' | 'cancelled'
@@ -10,7 +10,13 @@ export type AccountingType = 'income' | 'expense'
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'refunded'
 export type MovementType = 'in' | 'out' | 'adjustment'
 
+type NullableKeys<T> = { [K in keyof T]: null extends T[K] ? K : never }[keyof T]
+type WithOptionalNulls<T> = Omit<T, NullableKeys<T>> & Partial<Pick<T, NullableKeys<T>>>
+
 export interface Database {
+  __InternalSupabase: {
+    PostgrestVersion: '12.2.3'
+  }
   public: {
     Tables: {
       plans: {
@@ -27,8 +33,9 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['plans']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['plans']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['plans']['Insert']>
+        Relationships: []
       }
       tenants: {
         Row: {
@@ -51,8 +58,10 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['tenants']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['tenants']['Row']>, 'id' | 'created_at' | 'updated_at' | 'brand_color' | 'country' | 'timezone' | 'is_active'>
+          & Partial<Pick<Database['public']['Tables']['tenants']['Row'], 'brand_color' | 'country' | 'timezone' | 'is_active'>>
         Update: Partial<Database['public']['Tables']['tenants']['Insert']>
+        Relationships: []
       }
       subscriptions: {
         Row: {
@@ -72,8 +81,12 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['subscriptions']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['subscriptions']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['subscriptions']['Insert']>
+        Relationships: [
+          { foreignKeyName: "subscriptions_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "subscriptions_plan_id_fkey"; columns: ["plan_id"]; isOneToOne: false; referencedRelation: "plans"; referencedColumns: ["id"] }
+        ]
       }
       feature_flags: {
         Row: {
@@ -87,8 +100,11 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['feature_flags']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['feature_flags']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['feature_flags']['Insert']>
+        Relationships: [
+          { foreignKeyName: "feature_flags_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       tenant_users: {
         Row: {
@@ -104,8 +120,11 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['tenant_users']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['tenant_users']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['tenant_users']['Insert']>
+        Relationships: [
+          { foreignKeyName: "tenant_users_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       customers: {
         Row: {
@@ -126,8 +145,11 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['customers']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['customers']['Insert']>
+        Relationships: [
+          { foreignKeyName: "customers_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       work_orders: {
         Row: {
@@ -152,8 +174,12 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['work_orders']['Row'], 'id' | 'created_at' | 'updated_at' | 'order_number'> & { order_number?: string }
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['work_orders']['Row']>, 'id' | 'created_at' | 'updated_at' | 'order_number'> & { order_number?: string }
         Update: Partial<Database['public']['Tables']['work_orders']['Insert']>
+        Relationships: [
+          { foreignKeyName: "work_orders_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "work_orders_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }
+        ]
       }
       work_order_items: {
         Row: {
@@ -167,8 +193,13 @@ export interface Database {
           unit_price: number
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['work_order_items']['Row'], 'id' | 'created_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['work_order_items']['Row']>, 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['work_order_items']['Insert']>
+        Relationships: [
+          { foreignKeyName: "work_order_items_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "work_order_items_work_order_id_fkey"; columns: ["work_order_id"]; isOneToOne: false; referencedRelation: "work_orders"; referencedColumns: ["id"] },
+          { foreignKeyName: "work_order_items_inventory_item_id_fkey"; columns: ["inventory_item_id"]; isOneToOne: false; referencedRelation: "inventory_items"; referencedColumns: ["id"] }
+        ]
       }
       production_boards: {
         Row: {
@@ -182,8 +213,11 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['production_boards']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['production_boards']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['production_boards']['Insert']>
+        Relationships: [
+          { foreignKeyName: "production_boards_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       production_columns: {
         Row: {
@@ -197,8 +231,12 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['production_columns']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['production_columns']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['production_columns']['Insert']>
+        Relationships: [
+          { foreignKeyName: "production_columns_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "production_columns_board_id_fkey"; columns: ["board_id"]; isOneToOne: false; referencedRelation: "production_boards"; referencedColumns: ["id"] }
+        ]
       }
       production_cards: {
         Row: {
@@ -218,8 +256,14 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['production_cards']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['production_cards']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['production_cards']['Insert']>
+        Relationships: [
+          { foreignKeyName: "production_cards_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "production_cards_board_id_fkey"; columns: ["board_id"]; isOneToOne: false; referencedRelation: "production_boards"; referencedColumns: ["id"] },
+          { foreignKeyName: "production_cards_column_id_fkey"; columns: ["column_id"]; isOneToOne: false; referencedRelation: "production_columns"; referencedColumns: ["id"] },
+          { foreignKeyName: "production_cards_work_order_id_fkey"; columns: ["work_order_id"]; isOneToOne: false; referencedRelation: "work_orders"; referencedColumns: ["id"] }
+        ]
       }
       inventory_categories: {
         Row: {
@@ -229,8 +273,11 @@ export interface Database {
           description: string | null
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['inventory_categories']['Row'], 'id' | 'created_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['inventory_categories']['Row']>, 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['inventory_categories']['Insert']>
+        Relationships: [
+          { foreignKeyName: "inventory_categories_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       inventory_items: {
         Row: {
@@ -253,8 +300,12 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['inventory_items']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['inventory_items']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['inventory_items']['Insert']>
+        Relationships: [
+          { foreignKeyName: "inventory_items_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "inventory_items_category_id_fkey"; columns: ["category_id"]; isOneToOne: false; referencedRelation: "inventory_categories"; referencedColumns: ["id"] }
+        ]
       }
       inventory_movements: {
         Row: {
@@ -272,8 +323,13 @@ export interface Database {
           created_by: string | null
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['inventory_movements']['Row'], 'id' | 'created_at' | 'stock_before' | 'stock_after'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['inventory_movements']['Row']>, 'id' | 'created_at' | 'stock_before' | 'stock_after'>
         Update: never
+        Relationships: [
+          { foreignKeyName: "inventory_movements_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "inventory_movements_item_id_fkey"; columns: ["item_id"]; isOneToOne: false; referencedRelation: "inventory_items"; referencedColumns: ["id"] },
+          { foreignKeyName: "inventory_movements_work_order_id_fkey"; columns: ["work_order_id"]; isOneToOne: false; referencedRelation: "work_orders"; referencedColumns: ["id"] }
+        ]
       }
       documents: {
         Row: {
@@ -291,8 +347,13 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['documents']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['documents']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['documents']['Insert']>
+        Relationships: [
+          { foreignKeyName: "documents_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "documents_work_order_id_fkey"; columns: ["work_order_id"]; isOneToOne: false; referencedRelation: "work_orders"; referencedColumns: ["id"] },
+          { foreignKeyName: "documents_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }
+        ]
       }
       accounting_categories: {
         Row: {
@@ -303,8 +364,11 @@ export interface Database {
           description: string | null
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['accounting_categories']['Row'], 'id' | 'created_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['accounting_categories']['Row']>, 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['accounting_categories']['Insert']>
+        Relationships: [
+          { foreignKeyName: "accounting_categories_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       accounting_entries: {
         Row: {
@@ -324,8 +388,14 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['accounting_entries']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['accounting_entries']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['accounting_entries']['Insert']>
+        Relationships: [
+          { foreignKeyName: "accounting_entries_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "accounting_entries_category_id_fkey"; columns: ["category_id"]; isOneToOne: false; referencedRelation: "accounting_categories"; referencedColumns: ["id"] },
+          { foreignKeyName: "accounting_entries_work_order_id_fkey"; columns: ["work_order_id"]; isOneToOne: false; referencedRelation: "work_orders"; referencedColumns: ["id"] },
+          { foreignKeyName: "accounting_entries_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] }
+        ]
       }
       receipts: {
         Row: {
@@ -351,8 +421,13 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['receipts']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['receipts']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['receipts']['Insert']>
+        Relationships: [
+          { foreignKeyName: "receipts_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "receipts_customer_id_fkey"; columns: ["customer_id"]; isOneToOne: false; referencedRelation: "customers"; referencedColumns: ["id"] },
+          { foreignKeyName: "receipts_work_order_id_fkey"; columns: ["work_order_id"]; isOneToOne: false; referencedRelation: "work_orders"; referencedColumns: ["id"] }
+        ]
       }
       support_tickets: {
         Row: {
@@ -368,8 +443,11 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['support_tickets']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['support_tickets']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['support_tickets']['Insert']>
+        Relationships: [
+          { foreignKeyName: "support_tickets_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] }
+        ]
       }
       support_messages: {
         Row: {
@@ -381,8 +459,11 @@ export interface Database {
           attachments: Json
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['support_messages']['Row'], 'id' | 'created_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['support_messages']['Row']>, 'id' | 'created_at'>
         Update: never
+        Relationships: [
+          { foreignKeyName: "support_messages_ticket_id_fkey"; columns: ["ticket_id"]; isOneToOne: false; referencedRelation: "support_tickets"; referencedColumns: ["id"] }
+        ]
       }
       payments: {
         Row: {
@@ -403,13 +484,21 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<WithOptionalNulls<Database['public']['Tables']['payments']['Row']>, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['payments']['Insert']>
+        Relationships: [
+          { foreignKeyName: "payments_tenant_id_fkey"; columns: ["tenant_id"]; isOneToOne: false; referencedRelation: "tenants"; referencedColumns: ["id"] },
+          { foreignKeyName: "payments_subscription_id_fkey"; columns: ["subscription_id"]; isOneToOne: false; referencedRelation: "subscriptions"; referencedColumns: ["id"] },
+          { foreignKeyName: "payments_plan_id_fkey"; columns: ["plan_id"]; isOneToOne: false; referencedRelation: "plans"; referencedColumns: ["id"] }
+        ]
       }
     }
+    Views: Record<string, never>
     Functions: {
-      auth_tenant_id: { Returns: string }
-      auth_is_tenant_admin: { Returns: boolean }
+      auth_tenant_id: { Args: Record<string, never>; Returns: string }
+      auth_is_tenant_admin: { Args: Record<string, never>; Returns: boolean }
     }
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }

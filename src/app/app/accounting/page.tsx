@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
 import SyncOrdersButton from "./sync-button"
 
+export const dynamic = "force-dynamic"
+
 type Entry = {
   id: string
   date: string

@@ -2,6 +2,15 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 
+type WorkOrderRow = {
+  id: string
+  order_number: string
+  title: string
+  price: number
+  customer_id: string | null
+  created_at: string
+}
+
 export async function POST() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,14 +27,16 @@ export async function POST() {
   if (!tenantId) return NextResponse.json({ error: "Sin tenant asignado" }, { status: 403 })
 
   // Obtener todas las órdenes con precio > 0 del tenant
-  const { data: orders, error: ordersError } = await admin
+  const { data: rawOrders, error: ordersError } = await admin
     .from("work_orders")
     .select("id, order_number, title, price, customer_id, created_at")
     .eq("tenant_id", tenantId)
     .gt("price", 0)
 
   if (ordersError) return NextResponse.json({ error: ordersError.message }, { status: 400 })
-  if (!orders?.length) return NextResponse.json({ synced: 0 })
+
+  const orders = (rawOrders ?? []) as WorkOrderRow[]
+  if (!orders.length) return NextResponse.json({ synced: 0, total_with_price: 0 })
 
   // Obtener IDs de órdenes que ya tienen entrada contable
   const { data: existing } = await admin
@@ -39,7 +50,7 @@ export async function POST() {
 
   // Filtrar órdenes sin entrada contable
   const toInsert = orders.filter((o) => !existingIds.has(o.id))
-  if (!toInsert.length) return NextResponse.json({ synced: 0 })
+  if (!toInsert.length) return NextResponse.json({ synced: 0, total_with_price: orders.length })
 
   const entries = toInsert.map((o) => ({
     tenant_id: tenantId,
@@ -52,8 +63,9 @@ export async function POST() {
     created_by: user.id,
   }))
 
-  const { error: insertError } = await admin.from("accounting_entries").insert(entries)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: insertError } = await (admin as any).from("accounting_entries").insert(entries)
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 400 })
 
-  return NextResponse.json({ synced: toInsert.length })
+  return NextResponse.json({ synced: toInsert.length, total_with_price: orders.length })
 }
